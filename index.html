@@ -3,325 +3,176 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>AI Coder — Single-file GitHub Pages App</title>
-  <meta name="description" content="AI-powered coding assistant chat built as a single HTML file for GitHub Pages." />
-
-  <!-- Tailwind via CDN (works on static pages) -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Prism for syntax highlighting -->
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" rel="stylesheet" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-markup.min.js"></script>
-
+  <title>AI Chat — Coding Assistant</title>
+  <meta name="description" content="Minimal AI chat for coding. Paste your OpenAI API key and chat." />
   <style>
-    /* small polishing for the single-file app */
-    html,body,#app { height: 100%; }
-    pre.code-block { white-space: pre-wrap; word-break: break-word; }
-    .message { max-width: 100%; }
+    :root{
+      --bg:#0f1724; --panel:#0b1220; --muted:#9aa4b2; --accent:#60a5fa;
+      --user:#0ea5a4; --ai:#7c3aed;
+    }
+    html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg),#071026);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial;}
+    .wrap{max-width:900px;margin:28px auto;padding:18px; background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius:12px; box-shadow:0 10px 30px rgba(2,6,23,0.6);}
+    header{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+    h1{color:#e6eef8;font-size:18px;margin:0;}
+    .muted{color:var(--muted);font-size:13px;}
+    .controls{display:flex;gap:8px;align-items:center;margin:10px 0;}
+    input[type="password"]{flex:1;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:#dbeafe;}
+    button{padding:9px 12px;border-radius:8px;border:0;background:var(--accent);color:#05223b;font-weight:600;cursor:pointer}
+    button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--muted)}
+    main{display:flex;gap:16px;}
+    .chat{flex:1;min-height:420px;background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005));padding:14px;border-radius:10px;border:1px solid rgba(255,255,255,0.02);overflow:auto;max-height:62vh;}
+    .row{display:flex;gap:8px;margin:8px 0;align-items:flex-end}
+    .msg{padding:12px;border-radius:10px;max-width:85%;white-space:pre-wrap;line-height:1.45}
+    .from-user{margin-left:auto;background:linear-gradient(90deg,var(--user),#06b6d4);color:#022;box-shadow:0 6px 18px rgba(14,165,164,0.08)}
+    .from-ai{background:linear-gradient(90deg,var(--ai),#8b5cf6);color:#061025;box-shadow:0 6px 18px rgba(124,58,237,0.06)}
+    .meta{font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:6px}
+    footer{display:flex;gap:8px;margin-top:12px;align-items:center}
+    textarea{flex:1;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:#e6eef8;min-height:56px;resize:vertical}
+    .note{font-size:12px;color:var(--muted);margin-top:8px}
+    .small{font-size:12px;color:var(--muted)}
+    .sys{width:100%;padding:8px;border-radius:8px;border:1px dashed rgba(255,255,255,0.03);background:transparent;color:var(--muted)}
+    .center{display:flex;justify-content:center}
   </style>
 </head>
-<body class="bg-slate-50 text-slate-900">
-  <div id="app" class="h-full p-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
-    <!-- Left: Controls / Chat -->
-    <div class="lg:col-span-1 bg-white rounded-2xl shadow p-4 flex flex-col gap-4">
-      <div class="flex items-center justify-between">
-        <h1 class="text-lg font-semibold">AI Coder — Chat (frontend only)</h1>
-        <div class="text-xs text-slate-500">Single-file · GitHub Pages</div>
+<body>
+  <div class="wrap">
+    <header>
+      <div style="flex:1">
+        <h1>AI Chat — Coding Assistant</h1>
+        <div class="muted">Simple chat UI — paste your OpenAI API key and ask for code help</div>
       </div>
+      <div class="small">Single file • client-side</div>
+    </header>
 
-      <!-- API key / settings -->
-      <div class="space-y-2">
-        <label class="block text-xs font-medium text-slate-600">OpenAI API Key</label>
-        <div class="flex gap-2">
-          <input id="apiKey" type="password" placeholder="sk-... (not stored unless you ask)"
-            class="flex-1 rounded-md border px-3 py-2 text-sm" />
-          <button id="saveKey" class="bg-sky-600 text-white px-3 rounded-md text-sm">Save</button>
-        </div>
-        <div class="text-xs text-slate-500">This page will use your key in the browser to call the OpenAI API. Do not paste a key you don't want used client-side. Keys are stored in localStorage only if you press Save.</div>
-      </div>
-
-      <hr />
-
-      <div class="flex-1 overflow-auto flex flex-col gap-3" id="chatArea" aria-live="polite">
-        <!-- chat messages inserted here -->
-      </div>
-
-      <div class="pt-2">
-        <label class="text-xs text-slate-600">System instruction (tune for coding)</label>
-        <textarea id="systemPrompt" rows="3" class="w-full rounded-md border p-2 text-sm">You are an AI assistant specialized in writing, explaining, and debugging code. Provide clear, concise answers with examples and code blocks. Prioritize safe, modern practices. When giving code, include only the code block unless the user asks for explanation. Always format code snippets. If a user asks to run JS, give a sandbox suggestion instead of running arbitrary code without consent.</textarea>
-      </div>
-
-      <div class="flex gap-2">
-        <input id="userInput" type="text" placeholder="Ask about JavaScript, Python, HTML..." class="flex-1 rounded-md border px-3 py-2 text-sm" />
-        <button id="sendBtn" class="bg-emerald-600 text-white px-4 rounded-md">Send</button>
-      </div>
-
-      <div class="text-xs text-slate-500">Tip: start messages with "Fix:" to request code fixes, or "Explain:" for walkthroughs. Use triple-backticks to request formatted examples.</div>
+    <div class="controls">
+      <input id="key" type="password" placeholder="Paste OpenAI API key (sk-...)" autocomplete="off" />
+      <button id="save">Save</button>
+      <button id="clear" class="ghost">Clear Key</button>
     </div>
 
-    <!-- Middle: Code editor / file explorer -->
-    <div class="lg:col-span-1 bg-white rounded-2xl shadow p-4 flex flex-col gap-3">
-      <div class="flex items-center justify-between">
-        <h2 class="font-medium">Code Editor</h2>
-        <div class="text-xs text-slate-500">Lightweight — uses &lt;textarea&gt; + Prism</div>
-      </div>
+    <div class="note">System prompt (controls assistant behavior):</div>
+    <div style="margin:8px 0"><textarea id="system" class="sys" rows="2">You are a helpful assistant specialized in writing and explaining code. Give concise answers and include runnable examples when useful. Prefer safe, modern practices.</textarea></div>
 
-      <div class="flex gap-2">
-        <select id="language" class="rounded-md border px-2 py-1 text-sm">
-          <option value="javascript">JavaScript</option>
-          <option value="python">Python</option>
-          <option value="html">HTML</option>
-          <option value="css">CSS</option>
-        </select>
-        <button id="formatBtn" class="px-2 py-1 rounded-md border text-sm">Format (light)</button>
-        <button id="runJS" class="px-2 py-1 rounded-md border text-sm">Run JS (sandbox)</button>
-        <button id="download" class="ml-auto px-2 py-1 rounded-md border text-sm">Download</button>
-      </div>
+    <main>
+      <div class="chat" id="chat" aria-live="polite"></div>
+    </main>
 
-      <textarea id="editor" rows="14" class="w-full rounded-md border p-3 font-mono text-sm">// Start coding here
-console.log('Hello from AI Coder');
-</textarea>
+    <footer>
+      <textarea id="input" placeholder="Ask about JavaScript, Python, HTML... (Shift+Enter for newline)"></textarea>
+      <button id="send">Send</button>
+    </footer>
 
-      <div>
-        <div class="text-xs text-slate-500 mb-2">Preview / Highlight</div>
-        <pre class="rounded-md border p-3 overflow-auto code-block"><code id="highlight" class="language-javascript">// highlighted code appears here</code></pre>
-      </div>
-    </div>
-
-    <!-- Right: Live preview + utilities -->
-    <div class="lg:col-span-1 bg-white rounded-2xl shadow p-4 flex flex-col gap-3">
-      <div class="flex items-center justify-between">
-        <h2 class="font-medium">Preview & Utilities</h2>
-        <div class="text-xs text-slate-500">Export / GitHub</div>
-      </div>
-
-      <div class="space-y-2 text-sm">
-        <button id="createGist" class="w-full bg-indigo-600 text-white px-3 py-2 rounded-md">Create Gist (copy)</button>
-        <button id="openGithubPages" class="w-full bg-slate-100 border px-3 py-2 rounded-md">Open as GitHub Pages template</button>
-        <button id="clearChat" class="w-full bg-rose-100 border px-3 py-2 rounded-md">Clear chat</button>
-      </div>
-
-      <div class="flex-1">
-        <div class="text-xs text-slate-500 mb-2">HTML Preview (use when editing HTML)</div>
-        <iframe id="previewFrame" sandbox="allow-scripts allow-same-origin" class="w-full h-72 rounded-md border"></iframe>
-      </div>
-
-      <div class="text-xs text-slate-400">Built to be dropped directly into a GitHub Pages repo as <code>index.html</code>.</div>
+    <div class="center" style="margin-top:10px">
+      <div class="small muted">No messages are sent to any server except OpenAI. Keys are stored in localStorage only if you press Save.</div>
     </div>
   </div>
 
-  <script>
-    // ------------------------
-    // Minimal single-file AI chat for coding
-    // Drop-in to GitHub Pages as index.html
-    // ------------------------
+<script>
+  // Minimal chat-only single-file app
+  const keyInput = document.getElementById('key');
+  const saveBtn = document.getElementById('save');
+  const clearBtn = document.getElementById('clear');
+  const sendBtn = document.getElementById('send');
+  const inputEl = document.getElementById('input');
+  const chat = document.getElementById('chat');
+  const systemEl = document.getElementById('system');
 
-    const apiKeyInput = document.getElementById('apiKey');
-    const saveKeyBtn = document.getElementById('saveKey');
-    const sendBtn = document.getElementById('sendBtn');
-    const userInput = document.getElementById('userInput');
-    const chatArea = document.getElementById('chatArea');
-    const systemPrompt = document.getElementById('systemPrompt');
-    const editor = document.getElementById('editor');
-    const highlight = document.getElementById('highlight');
-    const languageSelect = document.getElementById('language');
-    const previewFrame = document.getElementById('previewFrame');
+  // load saved key
+  if (localStorage.getItem('ai_chat_key')) keyInput.value = localStorage.getItem('ai_chat_key');
 
-    // Load saved key if present
-    if (localStorage.getItem('ai_coder_key')) {
-      apiKeyInput.value = localStorage.getItem('ai_coder_key');
-    }
+  saveBtn.onclick = () => {
+    const k = keyInput.value.trim();
+    if(!k){ alert('Paste an API key to save.'); return; }
+    localStorage.setItem('ai_chat_key', k);
+    alert('Key saved to localStorage (client-side).');
+  };
+  clearBtn.onclick = () => {
+    localStorage.removeItem('ai_chat_key');
+    keyInput.value = '';
+    alert('Key cleared from localStorage.');
+  };
 
-    saveKeyBtn.addEventListener('click', () => {
-      const k = apiKeyInput.value.trim();
-      if (!k) return alert('Enter an API key to save');
-      localStorage.setItem('ai_coder_key', k);
-      alert('Key saved to localStorage. Remember: this is client-side only.');
-    });
+  // In-memory history (role/content)
+  const history = [];
 
-    function appendMessage(role, text) {
-      const wrapper = document.createElement('div');
-      wrapper.className = `p-3 rounded-lg ${role === 'user' ? 'bg-slate-100 self-end' : 'bg-slate-50'} message`;
-      const r = document.createElement('div');
-      r.className = 'text-xs text-slate-500 mb-1';
-      r.innerText = role === 'user' ? 'You' : (role === 'assistant' ? 'AI' : role);
-      const content = document.createElement('div');
-      // simple markdown-ish rendering for code blocks
-      if (text.includes('```')) {
-        const parts = text.split(/```(\w*)\n?|```/g).filter(Boolean);
-        // parts alternate: maybe lang, code, plain... simple handling
-        content.innerHTML = '';
-        // split by triple backticks
-        const blocks = text.split(/```[\s\S]*?```/g);
-        // This is a naive approach — preserve code blocks manually
-        let remaining = text;
-        while (remaining.length) {
-          const m = remaining.match(/```(\w*)\n([\s\S]*?)```/);
-          if (!m) { content.appendChild(document.createTextNode(remaining)); break; }
-          const [full, lang, code] = m;
-          const before = remaining.slice(0, m.index);
-          if (before) content.appendChild(document.createTextNode(before));
-          const pre = document.createElement('pre');
-          pre.className = 'rounded-md border p-2 overflow-auto';
-          const codeEl = document.createElement('code');
-          codeEl.className = 'language-' + (lang || 'javascript');
-          codeEl.textContent = code.trim();
-          pre.appendChild(codeEl);
-          content.appendChild(pre);
-          remaining = remaining.slice(m.index + full.length);
-        }
-        Prism.highlightAllUnder(content);
-      } else {
-        content.innerText = text;
+  function addMessage(role, text){
+    const wrap = document.createElement('div');
+    wrap.className = 'row';
+    const bubble = document.createElement('div');
+    bubble.className = 'msg ' + (role === 'user' ? 'from-user' : 'from-ai');
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.textContent = role === 'user' ? 'You' : 'AI';
+    bubble.appendChild(meta);
+    const body = document.createElement('div');
+    body.textContent = text;
+    bubble.appendChild(body);
+    wrap.appendChild(bubble);
+    chat.appendChild(wrap);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  async function fetchReply(userText){
+    const key = keyInput.value.trim() || localStorage.getItem('ai_chat_key');
+    if(!key){ alert('Please paste your OpenAI API key in the box.'); return; }
+
+    addMessage('user', userText);
+    history.push({role:'user', content:userText});
+
+    // placeholder
+    const placeholder = document.createElement('div');
+    placeholder.className = 'row';
+    placeholder.innerHTML = '<div class="msg from-ai"><div class="meta">AI</div><div>...</div></div>';
+    chat.appendChild(placeholder);
+    chat.scrollTop = chat.scrollHeight;
+
+    // build messages: system + last 12
+    const messages = [{role:'system', content: systemEl.value}];
+    const recent = history.slice(-12);
+    recent.forEach(m => messages.push(m));
+
+    try {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + key },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages,
+          temperature: 0.15,
+          max_tokens: 800
+        })
+      });
+
+      if(!res.ok){
+        const txt = await res.text();
+        throw new Error('OpenAI error: ' + res.status + ' ' + txt);
       }
-      wrapper.appendChild(r);
-      wrapper.appendChild(content);
-      chatArea.appendChild(wrapper);
-      chatArea.scrollTop = chatArea.scrollHeight;
+      const data = await res.json();
+      const assistant = data.choices?.[0]?.message?.content || 'No response.';
+      // remove placeholder and append real
+      chat.removeChild(placeholder);
+      addMessage('assistant', assistant);
+      history.push({role:'assistant', content:assistant});
+    } catch (err) {
+      chat.removeChild(placeholder);
+      addMessage('assistant', 'Error: ' + err.message);
+      console.error(err);
     }
+  }
 
-    // Chat history held in-memory (not saved to server)
-    const history = [];
+  sendBtn.onclick = () => {
+    const t = inputEl.value.trim();
+    if(!t) return;
+    inputEl.value = '';
+    fetchReply(t);
+  };
 
-    async function sendToOpenAI(userMessage) {
-      const key = apiKeyInput.value.trim() || localStorage.getItem('ai_coder_key');
-      if (!key) return alert('Please paste your OpenAI API key in the box and Save or keep it in the field.');
+  inputEl.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); sendBtn.click(); }
+  });
 
-      appendMessage('user', userMessage);
-      history.push({ role: 'user', content: userMessage });
-
-      // show assistant placeholder
-      const placeholder = document.createElement('div');
-      placeholder.className = 'p-3 rounded-lg bg-slate-50';
-      placeholder.innerText = 'AI is typing...';
-      chatArea.appendChild(placeholder);
-      chatArea.scrollTop = chatArea.scrollHeight;
-
-      // build messages: system + last 10 messages
-      const messages = [
-        { role: 'system', content: systemPrompt.value }
-      ];
-      // include some of the history
-      const recent = history.slice(-10);
-      for (const m of recent) messages.push(m);
-
-      try {
-        const res = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + key
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o-mini', // change if you prefer a different model
-            messages,
-            max_tokens: 900,
-            temperature: 0.12,
-            top_p: 1
-          })
-        });
-
-        if (!res.ok) {
-          const txt = await res.text();
-          throw new Error('OpenAI error: ' + res.status + ' ' + txt);
-        }
-
-        const data = await res.json();
-        const assistant = data.choices?.[0]?.message?.content || JSON.stringify(data);
-        history.push({ role: 'assistant', content: assistant });
-        chatArea.removeChild(placeholder);
-        appendMessage('assistant', assistant);
-      } catch (err) {
-        chatArea.removeChild(placeholder);
-        appendMessage('assistant', 'Error: ' + err.message);
-        console.error(err);
-      }
-    }
-
-    sendBtn.addEventListener('click', () => {
-      const t = userInput.value.trim();
-      if (!t) return;
-      sendToOpenAI(t);
-      userInput.value = '';
-    });
-
-    userInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendBtn.click();
-      }
-    });
-
-    // Editor helpers
-    function refreshHighlight() {
-      const lang = languageSelect.value;
-      highlight.className = 'language-' + (lang === 'html' ? 'markup' : lang);
-      highlight.textContent = editor.value;
-      Prism.highlightElement(highlight);
-    }
-    editor.addEventListener('input', refreshHighlight);
-    languageSelect.addEventListener('change', refreshHighlight);
-    refreshHighlight();
-
-    document.getElementById('formatBtn').addEventListener('click', () => {
-      // very light formatting: trim trailing spaces and ensure newline at EOF
-      const v = editor.value.split('\n').map(line => line.replace(/\s+$/,'')).join('\n').trim() + '\n';
-      editor.value = v;
-      refreshHighlight();
-      alert('Light formatting applied');
-    });
-
-    document.getElementById('runJS').addEventListener('click', () => {
-      const code = editor.value;
-      // sandboxed run: create blob and iframe to execute without access to parent
-      const blob = new Blob([
-        `<!doctype html><html><body><script>try{\n${code}\n}catch(e){parent.postMessage({type:'run-error', error:e.message},'*')}</script></body></html>`
-      ], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      previewFrame.src = url;
-    });
-
-    document.getElementById('download').addEventListener('click', () => {
-      const lang = languageSelect.value;
-      const ext = lang === 'html' ? 'html' : (lang === 'javascript' ? 'js' : (lang === 'python' ? 'py' : 'txt'));
-      const blob = new Blob([editor.value], { type: 'text/plain' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `file.${ext}`;
-      a.click();
-    });
-
-    // utilities
-    document.getElementById('createGist').addEventListener('click', async () => {
-      // create a quick copyable gist-like content (no network calls to GitHub so user can paste into gist.github.com)
-      const payload = `// AI Coder export\n\n` + editor.value;
-      await navigator.clipboard.writeText(payload);
-      alert('Code copied to clipboard. Paste into gist.github.com to create a gist.');
-    });
-
-    document.getElementById('openGithubPages').addEventListener('click', () => {
-      const template = `<!doctype html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<title>My GitHub Pages Preview</title>\n</head>\n<body>\n${editor.value}\n</body>\n</html>`;
-      // copy template to clipboard
-      navigator.clipboard.writeText(template).then(()=> alert('A minimal GitHub Pages template has been copied to clipboard. Create a repo, add index.html, and publish.'))
-    });
-
-    document.getElementById('clearChat').addEventListener('click', () => {
-      if (!confirm('Clear chat history?')) return;
-      chatArea.innerHTML = '';
-      history.length = 0;
-    });
-
-    // hook run-error messages from iframe
-    window.addEventListener('message', (e) => {
-      if (e.data?.type === 'run-error') {
-        appendMessage('assistant', 'Runtime error when running code: ' + e.data.error);
-      }
-    });
-
-    // small welcome
-    appendMessage('assistant', 'Hi — I\'m your AI Coder. Paste an OpenAI API key, tune the system prompt for how you want the assistant to behave, then ask me to explain, fix, or write code.\n\nExample: ```Fix: my fetch() code is failing with CORS```');
-  </script>
+  // Welcome message
+  addMessage('assistant', "Hello — I'm your coding AI. Paste an OpenAI API key above, then ask me to write, explain, or fix code. Example: \"Fix my fetch() code giving CORS\" or \"Show a simple Node.js Express example.\"");
+</script>
 </body>
 </html>
